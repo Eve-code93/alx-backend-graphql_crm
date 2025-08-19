@@ -27,7 +27,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'graphene_django',
     'django_filters',
-    'crm',  # your main app
+    'crm',  
+    'alx_backend_graphql_crm',  # your main app
 ]
 
 MIDDLEWARE = [
