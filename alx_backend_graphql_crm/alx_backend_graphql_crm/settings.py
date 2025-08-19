@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'graphene_django',
     'crm',
     'django_filters',
+    'alx_backend_graphql',
+
 ]
 
 MIDDLEWARE = [
