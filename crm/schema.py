@@ -1,8 +1,11 @@
 import graphene
 from graphene_django.types import DjangoObjectType
-from .models import Customer, Product, Order
-from django.db import transaction
+from graphene_django.filter import DjangoFilterConnectionField
 from django.core.exceptions import ValidationError
+from django.utils.dateparse import parse_datetime
+from .models import Customer, Product, Order
+from .filters import CustomerFilter, ProductFilter, OrderFilter
+
 
 # --------------------------
 # GraphQL Types
@@ -11,17 +14,32 @@ from django.core.exceptions import ValidationError
 class CustomerType(DjangoObjectType):
     class Meta:
         model = Customer
-        fields = ("id", "name", "email", "phone")
+        filterset_class = CustomerFilter
+        interfaces = (graphene.relay.Node,)
+
 
 class ProductType(DjangoObjectType):
     class Meta:
         model = Product
-        fields = ("id", "name", "price", "stock")
+        filterset_class = ProductFilter
+        interfaces = (graphene.relay.Node,)
+
 
 class OrderType(DjangoObjectType):
     class Meta:
         model = Order
-        fields = ("id", "customer", "products", "total_amount", "order_date")
+        filterset_class = OrderFilter
+        interfaces = (graphene.relay.Node,)
+
+
+# --------------------------
+# Input Types
+# --------------------------
+
+class CustomerInput(graphene.InputObjectType):
+    name = graphene.String(required=True)
+    email = graphene.String(required=True)
+    phone = graphene.String()
 
 
 # --------------------------
@@ -47,7 +65,7 @@ class CreateCustomer(graphene.Mutation):
 
 class BulkCreateCustomers(graphene.Mutation):
     class Arguments:
-        customers = graphene.List(lambda: CustomerInput, required=True)
+        customers = graphene.List(CustomerInput, required=True)
 
     customers_created = graphene.List(CustomerType)
     errors = graphene.List(graphene.String)
@@ -56,20 +74,13 @@ class BulkCreateCustomers(graphene.Mutation):
         created = []
         errors = []
         for data in customers:
-            name, email, phone = data.name, data.email, data.phone
-            if Customer.objects.filter(email=email).exists():
-                errors.append(f"Email {email} already exists")
+            if Customer.objects.filter(email=data.email).exists():
+                errors.append(f"Email {data.email} already exists")
                 continue
-            customer = Customer(name=name, email=email, phone=phone)
+            customer = Customer(name=data.name, email=data.email, phone=data.phone)
             customer.save()
             created.append(customer)
         return BulkCreateCustomers(customers_created=created, errors=errors)
-
-
-class CustomerInput(graphene.InputObjectType):
-    name = graphene.String(required=True)
-    email = graphene.String(required=True)
-    phone = graphene.String()
 
 
 class CreateProduct(graphene.Mutation):
@@ -110,7 +121,6 @@ class CreateOrder(graphene.Mutation):
 
         order = Order(customer=customer)
         if order_date:
-            from django.utils.dateparse import parse_datetime
             order.order_date = parse_datetime(order_date)
         order.save()
         order.products.set(products)
@@ -131,19 +141,25 @@ class Mutation(graphene.ObjectType):
 
 
 # --------------------------
-# Query Class
+# Query Class (with filters + ordering)
 # --------------------------
 
 class Query(graphene.ObjectType):
-    all_customers = graphene.List(CustomerType)
-    all_products = graphene.List(ProductType)
-    all_orders = graphene.List(OrderType)
+    all_customers = DjangoFilterConnectionField(CustomerType, order_by=graphene.List(of_type=graphene.String))
+    all_products = DjangoFilterConnectionField(ProductType, order_by=graphene.List(of_type=graphene.String))
+    all_orders = DjangoFilterConnectionField(OrderType, order_by=graphene.List(of_type=graphene.String))
 
-    def resolve_all_customers(self, info):
-        return Customer.objects.all()
+    def resolve_all_customers(root, info, **kwargs):
+        qs = Customer.objects.all()
+        order_by = kwargs.get("order_by")
+        return qs.order_by(*order_by) if order_by else qs
 
-    def resolve_all_products(self, info):
-        return Product.objects.all()
+    def resolve_all_products(root, info, **kwargs):
+        qs = Product.objects.all()
+        order_by = kwargs.get("order_by")
+        return qs.order_by(*order_by) if order_by else qs
 
-    def resolve_all_orders(self, info):
-        return Order.objects.all()
+    def resolve_all_orders(root, info, **kwargs):
+        qs = Order.objects.all()
+        order_by = kwargs.get("order_by")
+        return qs.order_by(*order_by) if order_by else qs
