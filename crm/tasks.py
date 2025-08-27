@@ -1,20 +1,37 @@
 from celery import shared_task
-from django.utils import timezone
-from crm.models import Customer, Order
+from datetime import datetime
+import requests
+
+GRAPHQL_URL = "http://localhost:8000/graphql/"
 
 @shared_task
 def generate_crm_report():
-    customers = Customer.objects.count()
-    orders = Order.objects.count()
-    revenue = Order.objects.aggregate(total=models.Sum("totalamount"))["total"] or 0
+    query = """
+    {
+        allCustomers {
+            totalCount
+        }
+        allOrders {
+            totalCount
+            totalAmount
+        }
+    }
+    """
 
-    report = (
-        f"{timezone.now().strftime('%Y-%m-%d %H:%M:%S')} - "
-        f"Report: {customers} customers, {orders} orders, {revenue} revenue\n"
-    )
+    try:
+        response = requests.post(GRAPHQL_URL, json={"query": query})
+        data = response.json().get("data", {})
 
-    log_path = "/tmp/crm_report_log.txt"
-    with open(log_path, "a") as f:
-        f.write(report)
+        total_customers = data.get("allCustomers", {}).get("totalCount", 0)
+        total_orders = data.get("allOrders", {}).get("totalCount", 0)
+        total_revenue = data.get("allOrders", {}).get("totalAmount", 0)
 
-    return report
+        report_line = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Report: {total_customers} customers, {total_orders} orders, {total_revenue} revenue\n"
+
+        with open("/tmp/crm_report_log.txt", "a") as log_file:
+            log_file.write(report_line)
+
+    except Exception as e:
+        error_line = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - Error generating report: {e}\n"
+        with open("/tmp/crm_report_log.txt", "a") as log_file:
+            log_file.write(error_line)
