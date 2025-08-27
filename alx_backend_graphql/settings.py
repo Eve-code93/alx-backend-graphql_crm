@@ -28,8 +28,16 @@ INSTALLED_APPS = [
     'graphene_django',
     'django_filters',
     'crm',  
-    'alx_backend_graphql_crm',  # your main app
+    'alx_backend_graphql_crm',
+    'django_crontab',
+      # your main app
 ]
+
+CRONJOBS = [
+    ('*/5 * * * *', 'crm.cron.log_crm_heartbeat'),   # every 5 minutes
+    ('0 */12 * * *', 'crm.cron.update_low_stock'),   # every 12 hours
+]
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

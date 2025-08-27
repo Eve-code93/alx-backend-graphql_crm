@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.utils.dateparse import parse_datetime
 from .models import Customer, Product, Order
 from .filters import CustomerFilter, ProductFilter, OrderFilter
+import graphene
+from .models import Product
 
 
 # --------------------------
@@ -163,3 +165,19 @@ class Query(graphene.ObjectType):
         qs = Order.objects.all()
         order_by = kwargs.get("order_by")
         return qs.order_by(*order_by) if order_by else qs
+
+class UpdateLowStockProducts(graphene.Mutation):
+    success = graphene.String()
+    updated_products = graphene.List(graphene.String)
+
+    def mutate(self, info):
+        low_stock = Product.objects.filter(stock__lt=10)
+        updated = []
+        for product in low_stock:
+            product.stock += 10
+            product.save()
+            updated.append(f"{product.name}: {product.stock}")
+        return UpdateLowStockProducts(success="Restocked low-stock products", updated_products=updated)
+
+class Mutation(graphene.ObjectType):
+    update_low_stock_products = UpdateLowStockProducts.Field(
