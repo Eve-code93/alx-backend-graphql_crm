@@ -1,4 +1,7 @@
 import graphene
+
+from crm.models import Product
+
 from graphene_django.types import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 from django.core.exceptions import ValidationError
