@@ -180,4 +180,4 @@ class UpdateLowStockProducts(graphene.Mutation):
         return UpdateLowStockProducts(success="Restocked low-stock products", updated_products=updated)
 
 class Mutation(graphene.ObjectType):
-    update_low_stock_products = UpdateLowStockProducts.Field(
+    update_low_stock_products = UpdateLowStockProducts.Field()
